@@ -1,0 +1,18 @@
+# секретный ключ сервис-аккаунта — НЕ коммитим (в Actions берётся из Secret)
+service_account.json
+
+# сгенерированный фид (публикуется через Pages-artifact, в репо не нужен)
+public/feed.xml
+
+# локальные дампы
+dasmart.xml
+*.tmp
+
+# macOS
+.DS_Store
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
