@@ -84,8 +84,11 @@ gh secret set GOOGLE_SERVICE_ACCOUNT_JSON < service_account.json
 - **Правило 60 дней.** В публичном репозитории GitHub отключает расписание,
   если 60 дней не было коммитов. 24.08.2026 так и случилось: фид и таблица
   замёрзли на месяц. Теперь джоб `keepalive` после 50 дней тишины делает пустой
-  коммит. Если письмо «Рабочий процесс … отключен» всё же придёт:
-  `gh workflow enable "Update feed" && gh workflow run "Update feed"`.
+  коммит. Если письмо «Рабочий процесс … отключен» всё же придёт — кнопка
+  «Enable workflow» в Actions или
+  `gh api -X PUT repos/Ilya330/dasmart-parser/actions/workflows/update.yml/enable`,
+  затем `gh workflow run update.yml`. (`gh workflow enable "Update feed"`
+  отключённый за неактивность воркфлоу по имени не находит.)
 - **Сбои Google API** (разовые 503) повторяются с паузой; при сбое записи в
   таблицу фид всё равно публикуется, а прогон помечается красным.
 - **Фид публичный** (Prom.ua тянет без авторизации) → `<vendorprice>` виден всем,
