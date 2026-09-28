@@ -26,14 +26,20 @@ _GC = None
 
 
 def gspread_client():
-    """Ленивая инициализация gspread-клиента (один на прогон)."""
+    """Ленивая инициализация gspread-клиента (один на прогон).
+
+    BackOffHTTPClient повторяет запрос при 408/429/5xx с растущей паузой:
+    15.08 и 19.08.2026 прогоны падали на разовом 503 от Google.
+    Число попыток у него не ограничено — потолок задаёт timeout-minutes
+    джоба в update.yml.
+    """
     global _GC
     if _GC is None:
         import gspread
         from google.oauth2.service_account import Credentials
         scopes = ["https://www.googleapis.com/auth/spreadsheets"]
         creds = Credentials.from_service_account_file(SA_JSON, scopes=scopes)
-        _GC = gspread.authorize(creds)
+        _GC = gspread.authorize(creds, http_client=gspread.BackOffHTTPClient)
     return _GC
 
 
@@ -75,18 +81,21 @@ def main():
             matched += 1
     print(f"  товаров с опт-ценой: {matched} / {len(products)}", flush=True)
 
+    # --- сборка фида ---
+    # Фид собирается ДО записи в таблицу: он от таблицы не зависит, и сбой
+    # записи не должен оставлять маркетплейсы без свежих цен (update.yml
+    # публикует feed.xml, если он собран, даже когда этот шаг упал).
+    print("Сборка feed.xml...", flush=True)
+    build_feed.write_feed(categories, products, OUT_FEED)
+    size = os.path.getsize(OUT_FEED)
+    print(f"  {OUT_FEED} ({size / 1e6:.1f} МБ)", flush=True)
+
     # --- запись в таблицу ---
     if not args.no_sheets:
         print("Запись в Google-таблицу (Товари + Категорії)...", flush=True)
         import to_sheets
         n = to_sheets.write_all(gspread_client(), products, categories)
         print(f"  записано товаров: {n}", flush=True)
-
-    # --- сборка фида ---
-    print("Сборка feed.xml...", flush=True)
-    build_feed.write_feed(categories, products, OUT_FEED)
-    size = os.path.getsize(OUT_FEED)
-    print(f"  {OUT_FEED} ({size / 1e6:.1f} МБ)", flush=True)
     print("Готово.", flush=True)
 
 

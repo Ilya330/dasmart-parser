@@ -63,8 +63,9 @@ def _parse_offer(elem):
     return {
         "id": (elem.get("id") or "").strip(),
         "group_id": (elem.get("group_id") or "").strip(),
-        # available переносим как есть (у поставщика сейчас пусто)
-        "available": elem.get("available") or "",
+        # у поставщика пустой available = остаток 0, а маркетплейсы (Prom.ua)
+        # понимают только true/false — пустое отдаём явным "false"
+        "available": (elem.get("available") or "").strip() or "false",
         "vendorCode": _text(elem, "vendorCode"),
         "vendor": _text(elem, "vendor"),
         "name": _text(elem, "name"),

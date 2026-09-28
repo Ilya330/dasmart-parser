@@ -18,13 +18,16 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    # BackOffHTTPClient в run.py повторяет 5xx от Google без ограничения
+    # числа попыток — долгий сбой Google не должен висеть 6 часов
+    timeout-minutes: 20
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -39,10 +42,37 @@ jobs:
       - name: Build feed + update Google Sheet
         run: python run.py
 
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      # Фид публикуется, если собран, — даже когда упала запись в таблицу
+      # (run.py собирает feed.xml до неё; в репо его нет, он в .gitignore).
+      # Джоб при этом остаётся красным, письмо о сбое придёт.
+      - if: ${{ !cancelled() && hashFiles('public/feed.xml') != '' }}
+        uses: actions/configure-pages@v6
+      - if: ${{ !cancelled() && hashFiles('public/feed.xml') != '' }}
+        uses: actions/upload-pages-artifact@v5
         with:
           path: public
 
       - id: deployment
-        uses: actions/deploy-pages@v4
+        if: ${{ !cancelled() && hashFiles('public/feed.xml') != '' }}
+        uses: actions/deploy-pages@v5
+
+  # GitHub отключает cron в публичном репозитории после 60 дней без коммитов —
+  # так фид и замёрз 24.08.2026. После 50 дней тишины — пустой коммит,
+  # в остальных прогонах джоб только печатает возраст последнего коммита.
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Empty commit after 50 days without commits
+        run: |
+          days=$(( ( $(date +%s) - $(git log -1 --format=%ct) ) / 86400 ))
+          echo "последний коммит: $days дн. назад"
+          if [ "$days" -lt 50 ]; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "keepalive: $days дн. без коммитов, иначе GitHub отключит расписание"
+          git push
