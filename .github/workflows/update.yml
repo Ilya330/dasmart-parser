@@ -2,9 +2,12 @@ name: Update feed
 
 on:
   schedule:
-    # 5 раз в сутки: 06 / 10 / 14 / 18 / 22 по Киеву (перевод часов учтён)
-    - cron: "0 6,10,14,18,22 * * *"
-      timezone: "Europe/Kyiv"
+    # 5 раз в сутки: 06 / 10 / 14 / 18 / 22 по Киеву. cron здесь по UTC, а Киев
+    # летом UTC+3, зимой UTC+2 — поэтому два набора часов, лишний отсекает
+    # джоб gate. (С ключом timezone: "Europe/Kyiv" 28.09.2026 за 7 часов не было
+    # ни одного планового запуска.)
+    - cron: "0 3,7,11,15,19 * * *"   # летнее время Киева (UTC+3)
+    - cron: "0 4,8,12,16,20 * * *"   # зимнее время Киева (UTC+2)
   workflow_dispatch: {}        # ручной запуск кнопкой в Actions
 
 permissions:
@@ -17,7 +20,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Пропускает запуск из «чужого» набора часов: летнего зимой и наоборот.
+  # Ручной запуск проходит всегда.
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      run: ${{ steps.kyiv.outputs.run }}
+    steps:
+      - id: kyiv
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          case "$SCHEDULE" in
+            "0 3,7,11,15,19 * * *") want=+0300 ;;
+            "0 4,8,12,16,20 * * *") want=+0200 ;;
+            *) want="" ;;
+          esac
+          now=$(TZ=Europe/Kyiv date +%z)
+          if [ -z "$want" ] || [ "$now" = "$want" ]; then run=true; else run=false; fi
+          echo "расписание «$SCHEDULE», Киев сейчас UTC$now -> run=$run"
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
   build-and-deploy:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
     # BackOffHTTPClient в run.py повторяет 5xx от Google без ограничения
     # числа попыток — долгий сбой Google не должен висеть 6 часов

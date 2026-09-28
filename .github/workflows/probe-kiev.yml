@@ -1,0 +1,17 @@
+# ВРЕМЕННАЯ проба планировщика (28.09.2026): срабатывает ли cron
+# с timezone "Europe/Kiev". Удалить после диагностики.
+name: Probe schedule (kiev)
+
+on:
+  schedule:
+    - cron: "2-59/5 * * * *"
+      timezone: "Europe/Kiev"
+
+permissions: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: echo "schedule='${{ github.event.schedule }}' started $(date -u +%H:%M:%S) UTC"
