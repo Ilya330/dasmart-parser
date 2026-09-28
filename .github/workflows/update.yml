@@ -2,8 +2,9 @@ name: Update feed
 
 on:
   schedule:
-    # 3 раза в сутки (UTC) ≈ 06:00 / 14:00 / 22:00 по Киеву
-    - cron: "0 3,11,19 * * *"
+    # 5 раз в сутки: 06 / 10 / 14 / 18 / 22 по Киеву (перевод часов учтён)
+    - cron: "0 6,10,14,18,22 * * *"
+      timezone: "Europe/Kyiv"
   workflow_dispatch: {}        # ручной запуск кнопкой в Actions
 
 permissions:
